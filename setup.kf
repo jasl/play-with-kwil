@@ -1,0 +1,76 @@
+database playground;
+
+// doesn't support _ prefix
+table acl {
+    subject text notnull maxlen(64), // The querier, should be a DID
+    target text notnull maxlen(64),
+    read_level int notnull default(0), // 0 - no permission 1 - readable
+    write_level int notnull default(0), // 0 - no permission 1 - writable
+    creator text notnull,
+    #index_subject_and_target primary(subject, target)
+}
+
+action check_acl($target, $read_level, $write_level) private view {
+    SELECT
+    CASE
+        WHEN NOT EXISTS (
+            SELECT 1
+            FROM acl
+            WHERE 
+                subject = @caller
+                AND target = $target
+                AND read_level >= $read_level
+                AND write_level >= $write_level
+        )
+        THEN ERROR('Querier does not exist or no permission')
+        ELSE null
+    END as user_status;
+}
+
+action create_acl ($subject, $target, $read_level, $write_level) public owner {
+    INSERT INTO acl (subject, target, read_level, write_level, creator)
+    VALUES ($subject, $target, $read_level, $write_level, @caller);
+}
+
+action delete_acl ($subject, $target) public owner {
+    DELETE FROM acl WHERE subject = $subject AND target = $target;
+}
+
+action read_acl ($subject, $target) public view {
+    SELECT * FROM acl WHERE subject = $subject AND target = $target;
+}
+
+table reports {
+    did text notnull maxlen(64),
+    content text notnull maxlen(4096),
+    created_at int notnull,
+    #index_did_and_created_at primary(did, created_at)
+}
+
+action create_report ($content, $created_at) public {
+    check_acl('reports', 0, 1);
+    INSERT INTO reports (did, content, created_at)
+    VALUES (@caller, $content, $created_at);
+}
+
+@kgw(authn='true')
+action read_reports ($did, $created_at_after, $limit) public view {
+    check_acl($did, 1, 0);
+    SELECT *
+    FROM reports
+    WHERE
+        did = $did
+        AND created_at > $created_at_after
+    ORDER BY created_at ASC
+    LIMIT $limit;
+}
+
+action unchecked_read_reports ($did, $created_at_after, $limit) public view {
+    SELECT *
+    FROM reports
+    WHERE
+        did = $did
+        AND created_at > $created_at_after
+    ORDER BY created_at ASC
+    LIMIT $limit;
+}
