@@ -35,6 +35,7 @@ import { WebKwil } from 'npm:@kwilteam/kwil-js';
 const kwil = new WebKwil({
     kwilProvider: "http://localhost:8080",
     chainId: "kwil-chain-tmp",
+    unconfirmedNonce: true,
 });
 
 async function createACL(signer: KwilSigner, subject: string, target: string, readLevel: number, writeLevel: number) {
@@ -49,7 +50,7 @@ async function createACL(signer: KwilSigner, subject: string, target: string, re
                 $write_level: writeLevel,
             }
         ]
-    }, signer);
+    }, signer, true);
 
     return result;
 }
@@ -79,7 +80,7 @@ async function createReport(signer: KwilSigner, content: string, createdAt: numb
                 $created_at: createdAt,
             }
         ]
-    }, signer);
+    }, signer, true);
 
     return result;
 }
@@ -110,13 +111,13 @@ console.log(`Granting device ${deviceEthAddress} to write reports table permissi
 result = await createACL(dbOwnerKwilSigner, deviceEthAddress, "reports", 0, 1);
 console.log(result);
 
-await sleep(6); // Need to wait insertions in-block
+// await sleep(6); // Need to wait insertions in-block
 
 console.log(`Granting user ${userEthAddress} to read ${deviceEthAddress} reports permission`);
 result = await createACL(dbOwnerKwilSigner, userEthAddress, deviceEthAddress, 1, 0);
 console.log(result);
 
-await sleep(6); // Need to wait insertions in-block
+// await sleep(6); // Need to wait insertions in-block
 
 result = await readACL(deviceEthAddress, "reports");
 console.log(result);
@@ -130,7 +131,7 @@ console.log(`Device ${deviceEthAddress} creating a report`);
 result = await createReport(deviceKwilSigner, (new Date()).toISOString(), Math.trunc(Date.now() / 1000));
 console.log(result);
 
-await sleep(6); // Need to wait insertions in-block
+// await sleep(6); // Need to wait insertions in-block
 
 result = await readReports(userKwilSigner, deviceEthAddress, 0, 10);
 console.log(result);
@@ -143,4 +144,3 @@ try {
 } catch (ex) {
     console.error(ex.message);
 }
-
